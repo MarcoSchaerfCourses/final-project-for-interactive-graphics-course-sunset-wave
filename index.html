@@ -1,11 +1,22 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <div>
+  Select Difficulty! Easy <input id="DiffSlider" type="range"
+   min="0" max="1" step="1" value="1." />
+   Hard
+  </div>
+  <div>
+<button id="Start">Play!</button>
+</div>
+
 <title>s u n s e t  w a v e</title>
     <script src="build/three.js"></script>
     <script>
         function onLoad()
     {
+    difficulty = 50
+    started = false
     var sceneWidth;
 var sceneHeight;
 var camera;
@@ -45,6 +56,7 @@ var scoreText;
 var score;
 var hasCollided;
 var numClouds = 1
+rotWings = false
 timeCloud = 2
 collisions = 0
 all_cubes = []
@@ -52,16 +64,36 @@ all_rocks = []
 got_points = false;
 old_clockPoints = 0;
 clockPoints = new THREE.Clock()
+clockSpeed = new THREE.Clock()
+clockPoints.autostart = false;
+clockSpeed.autostart = false;
+
 clockPoints.start()
+
+document.getElementById("DiffSlider").onchange = function(){difficulty = 50 + 20*event.srcElement.value;
+console.log("hey")};
+
+document.getElementById("Start").onclick = function(){started = true;
+console.log("mammt")};
 
 init();
 
+function sleep(milliseconds) {
+  var start = new Date().getTime();
+  for (var i = 0; i < 1e7; i++) {
+    if ((new Date().getTime() - start) > milliseconds){
+      break;
+    }
+  }
+}
+
 function init() {
     // set up the scene
+
     createScene();
 
     //call game loop
-    update();
+    update()
 }
 
 function createScene(){
@@ -99,7 +131,7 @@ function createScene(){
     createCoreCloud();
     createSphereClouds(50);
     createSphereCubes(20);
-    createSphereRocks(70);
+    createSphereRocks(difficulty);
     //createOneCloud(5, 0, 29);
     //addClouds();
     //addClouds();
@@ -138,7 +170,7 @@ function createScene(){
     infoText.style.height = 100;
     infoText.style.backgroundColor = "white";
     infoText.innerHTML = "Left/Right - Move";
-    infoText.style.top = 10 + 'px';
+    infoText.style.top = 50 + 'px';
     infoText.style.left = 10 + 'px';
     document.body.appendChild(infoText);
 }
@@ -164,8 +196,9 @@ function handleKeyDown(keyEvent){
         }
     }else{
         if ( keyEvent.keyCode === 38){//up, jump
-            bounceValue=0.1;
-            jumping=true;
+            rollingSpeed+=0.005;
+            clockSpeed.start()
+
         }
         validMove=false;
     }
@@ -196,22 +229,29 @@ function addHero(){
                                                             map: THREE.ImageUtils.loadTexture("media/metal_texture.jpg")} )
     jumping=false;
     var cone = new THREE.Mesh(sphereGeometry, sphereMaterial);
-    var geometry = new THREE.BoxGeometry( 0.7, 0.1, 0.02 );
+    var geometry = new THREE.BoxGeometry( 0.35, 0.1, 0.02 );
     var material = new THREE.MeshPhongMaterial( {map: THREE.ImageUtils.loadTexture("media/metal_texture.jpg")} );
-    var cube = new THREE.Mesh( geometry, material );
+    cubeR = new THREE.Mesh( geometry, material );
+    cubeL = new THREE.Mesh( geometry, material );
     var geometry = new THREE.BoxGeometry( 0.02, 0.1, 0.5 );
     var material = new THREE.MeshPhongMaterial( {map: THREE.ImageUtils.loadTexture("media/metal_texture.jpg")});
     var cube2 = new THREE.Mesh( geometry, material );
 
-    cube.position.z -= 0.01
-    cube.position.y -= 0.2
+    cubeR.position.z -= 0.01
+    cubeL.position.z -= 0.01
+    cubeR.position.y -= 0.2
+    cubeL.position.y -= 0.2
+    cubeR.position.x += 0.35/2
+    cubeL.position.x -= 0.35/2
     cube2.position.y -= 0.2
     var singleGeometry = new THREE.Geometry();
 
     cone.updateMatrix();
     singleGeometry.merge(cone.geometry, cone.matrix);
-    cube.updateMatrix();
-    singleGeometry.merge(cube.geometry, cube.matrix);
+    cubeR.updateMatrix();
+    singleGeometry.merge(cubeR.geometry, cubeR.matrix);
+    cubeL.updateMatrix();
+    singleGeometry.merge(cubeL.geometry, cubeL.matrix);
     cube2.updateMatrix();
     singleGeometry.merge(cube2.geometry, cube2.matrix);
 
@@ -220,11 +260,27 @@ function addHero(){
     //heroSphere = new THREE.Mesh( singleGeometry, sphereMaterial );
     heroSphere = new THREE.Object3D()
     heroSphere.add(cone)
-    heroSphere.add(cube)
+    heroSphere.add(cubeR)
+    heroSphere.add(cubeL)
     heroSphere.add(cube2)
     heroSphere.receiveShadow = true;
     heroSphere.castShadow=true;
     scene.add( heroSphere );
+    var helix = new THREE.BoxGeometry(0.02, 0.02, 0.23);
+    var material = new THREE.MeshPhongMaterial ({color : 0x111111, map: THREE.ImageUtils.loadTexture("media/metal_texture.jpg")});
+    helixMeshR = new THREE.Mesh(helix, material);
+    cubeR.add(helixMeshR);
+    helixMeshR.rotation.y = 1;
+    helixMeshR.position.x = 0.3/2;
+    helixMeshR.position.y = .05;
+
+
+    helixMeshL = new THREE.Mesh(helix, material);
+    cubeL.add(helixMeshL);
+    helixMeshL.rotation.y = 1;
+    helixMeshL.position.x = -0.3/2;
+    helixMeshL.position.y = .05;
+
     heroSphere.position.y=heroBaseY;
     heroSphere.position.z=4.8;
     heroSphere.rotation.x -= 3.14169/2.2
@@ -500,7 +556,7 @@ function addLight(){
     var hemisphereLight = new THREE.HemisphereLight(0xFDF2FB,0xFDF2FB, .9)
     scene.add(hemisphereLight);
     sun = new THREE.DirectionalLight( 0xFDF2FB, 0.9);
-    sun.position.set( 12,6,-7 );
+    sun.position.set( 12,20, -30 );
     sun.castShadow = true;
     scene.add(sun);
     sun.shadow.mapSize.width = 256;
@@ -513,7 +569,37 @@ function addLight(){
 function update(){
     //stats.update();
     //animate
+    console.log(started);
+    if(started){
+    if(cubeR.rotation.y > 0.5){
+      rotWings = true
+    }
+    if(cubeR.rotation.y < - 0.5){
+      rotWings = false
+    }
+    if(!rotWings) {
+      cubeR.position.x+=0.01;
+      cubeR.rotation.y+=0.01;
+      cubeR.position.x-=0.01;
 
+      cubeL.position.x-=0.01;
+      cubeL.rotation.y-=0.01;
+      cubeL.position.x+=0.01;
+    }
+
+    if(rotWings) {
+      cubeR.position.x+=0.01;
+      cubeR.rotation.y-=0.01;
+      cubeR.position.x-=0.01;
+      cubeL.position.x-=0.01;
+      cubeL.rotation.y+=0.01;
+      cubeL.position.x+=0.01;
+    }
+
+
+    helixMeshR.rotation.y += 2;
+    helixMeshR.rotation.y += 2;
+    helixMeshL.rotation.y += 2;
     if (camera.position.y > 2.5){
         camera.position.y -= 1/80;
     }
@@ -525,6 +611,7 @@ function update(){
         coreCloud.position.z += 0.05
     }
 
+    if (clockSpeed.getElapsedTime() > 1) {rollingSpeed = 0.3*(0.005) + 0.7*(rollingSpeed);}
     rollingGroundSphere.rotation.x += rollingSpeed;
     coreCloud.rotation.x += rollingSpeed/3;
   //  heroSphere.rotation.x -= heroRollingSpeed;
@@ -562,6 +649,7 @@ function update(){
         }
     }
 
+
     heroSphere.position.y=heroBaseY;
     //add a sort of turbulance
     heroSphere.position.y+=bounceValue;
@@ -579,16 +667,21 @@ function update(){
 
     if(collisions <1){
         render(); //draw scene
+      }
+    }
 
     requestAnimationFrame(update);
-    }
-}
+
+  }
 
 
 function render(){
     renderer.render(scene, camera);//draw
 }
-
+function gameOver () {
+  //cancelAnimationFrame( globalRenderID );
+  //window.clearInterval( powerupSpawnIntervalID );
+}
 function onWindowResize() {
     //resize & align
     sceneHeight = window.innerHeight;
@@ -600,6 +693,7 @@ function onWindowResize() {
 }
     </script>
 </head>
+
 <body onLoad="onLoad();">
 
     <div id="TutContainer"></div>
